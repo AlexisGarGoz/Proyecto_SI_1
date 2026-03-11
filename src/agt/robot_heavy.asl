@@ -43,23 +43,23 @@ carrying(none).      // Contenedor que está cargando
     .wait(2000);
     
     .print("➡️  Movimiento 1: Aproximación cuidadosa al área de entrada (2,2)");
-    move_to_safe(2, 2);
+    move_to(2, 2);
     .wait(3000);
     
     .print("➡️  Movimiento 2: Navegar a zona central (8,6)");
-    move_to_safe(8, 6);
+    move_to(8, 6);
     .wait(3000);
     
     .print("➡️  Movimiento 3: Ir a zona de estanterías GRANDES (12,11)");
-    move_to_safe(12, 11);
+    move_to(12, 11);
     .wait(3000);
     
     .print("➡️  Movimiento 4: Explorar más estanterías grandes (14,10)");
-    move_to_safe(14, 10);
+    move_to(14, 10);
     .wait(3000);
     
     .print("➡️  Movimiento 5: Retornar a zona segura (6,6)");
-    move_to_safe(6, 6);
+    move_to(6, 6);
     .wait(3000);
     
     .print("✅ [HEAVY] Prueba de movimientos completada. Robot pesado funcionando.");
@@ -99,7 +99,7 @@ carrying(none).      // Contenedor que está cargando
     
     // Fase 1: Aproximación cuidadosa al área de entrada
     .print("📍 [HEAVY] Fase 1: Aproximación al área de entrada");
-    move_to_safe(1, 1);
+    move_to(1, 1);
     .wait(1000);  // Robot pesado es más lento
     
     // Fase 2: Recoger el contenedor pesado
@@ -128,9 +128,9 @@ carrying(none).      // Contenedor que está cargando
 // Navegar a la estantería (zona de estanterías grandes)
 +!navigate_to_shelf(ShelfId) : true <-
     // Estanterías grandes están en y=10-12
-    move_to_safe(12, 10);
+    move_to(12, 10);
     .wait(1000);  // Movimiento más lento por el peso
-    move_to_safe(14, 11);
+    move_to(14, 11);
     .wait(1000).
 
 /* ============================================================================
