@@ -319,8 +319,6 @@ public class WarehouseArtifact extends Environment {
         }
     }
 
-
-    //Esta es la función que hice primero, la dejo por si deja de funcionar el execuiteMoveTo o se necesita el código antiguo
     // /**
     //  * Acción: move_to(X, Y) Mueve el robot a la posición especificada
     //  */
@@ -329,39 +327,31 @@ public class WarehouseArtifact extends Environment {
     //         //ubica a donde queremos mover al robot
     //         int targetX = (int) ((NumberTerm) action.getTerm(0)).solve();
     //         int targetY = (int) ((NumberTerm) action.getTerm(1)).solve();
-
     //         //busca que el robot exista
     //         Robot robot = robots.get(agName);
     //         if (robot == null) {
     //             addError(agName, "robot_not_found", "Robot " + agName + " not found");
     //             return false;
     //         }
-
     //         int currentX = robot.getX();
     //         int currentY = robot.getY();
-
     //         // Verificar límites del escenario
     //         if (targetX < 0 || targetX >= GRID_WIDTH || targetY < 0 || targetY >= GRID_HEIGHT) {
     //             addError(agName, "illegal_move", "Position out of bounds: (" + targetX + "," + targetY + ")");
     //             return false;
     //         }
-
     //         // Verificar si hay obstáculos (excepto estanterías que son destinos válidos)
     //         if (grid[targetX][targetY] == CellType.BLOCKED) {
     //             addError(agName, "route_blocked", "Position blocked: (" + targetX + "," + targetY + ")");
     //             return false;
     //         }
-
     //         while (currentX != targetX || currentY != targetY) {
-
     //             // Calcular el siguiente paso en X
     //             int stepX = Integer.compare(targetX, currentX); // -1, 0 o 1
     //             // Calcular el siguiente paso en Y
     //             int stepY = Integer.compare(targetY, currentY); // -1, 0 o 1
-
     //             int nextX = currentX + stepX;
     //             int nextY = currentY + stepY;
-
     //             // Esperar si hay otro robot en la posición de destino
     //             // Esto hay que cambiarlo
     //             boolean occupied;
@@ -381,180 +371,165 @@ public class WarehouseArtifact extends Environment {
     //                     Thread.sleep(200); // esperar 200 ms antes de volver a comprobar
     //                 }
     //             } while (occupied);
-                
-
     //             robot.setPosition(nextX, nextY);
-
     //             // Log a la consola de la GUI
     //             if (view != null) {
     //                 view.logMessage(String.format("➡️  %s moved to (%d,%d)", agName, targetX, targetY));
     //             }
-
     //             // Actualizar percepción
     //             removePerceptsByUnif(agName, Literal.parseLiteral("robot_at(_,_)"));
     //             addPercept(agName, Literal.parseLiteral("robot_at(" + targetX + "," + targetY + ")"));
-
     //             if (view != null) {
     //                 view.update();
     //             }
-
     //             currentX = nextX;
     //             currentY = nextY;
-
     //             Thread.sleep(200); // simular tiempo de movimiento
-
     //             // Actualizar percepción
     //             removePerceptsByUnif(agName, Literal.parseLiteral("robot_at(_,_)"));
     //             addPercept(agName, Literal.parseLiteral("robot_at(" + targetX + "," + targetY + ")"));
-
     //         }
-
     //         return true;
-
     //     } catch (Exception e) {
     //         e.printStackTrace();
     //         return false;
     //     }
-
     // }
-
-
     private boolean executeMoveTo(String agName, Structure action) {
-    try {
-        // ubica a donde queremos mover al robot
-        int targetX = (int) ((NumberTerm) action.getTerm(0)).solve();
-        int targetY = (int) ((NumberTerm) action.getTerm(1)).solve();
+        try {
+            // ubica a donde queremos mover al robot
+            int targetX = (int) ((NumberTerm) action.getTerm(0)).solve();
+            int targetY = (int) ((NumberTerm) action.getTerm(1)).solve();
 
-        // busca que el robot exista
-        Robot robot = robots.get(agName);
-        if (robot == null) {
-            addError(agName, "robot_not_found", "Robot " + agName + " not found");
-            return false;
-        }
-
-        int currentX = robot.getX();
-        int currentY = robot.getY();
-
-        // Verificar límites del escenario
-        if (targetX < 0 || targetX >= GRID_WIDTH || targetY < 0 || targetY >= GRID_HEIGHT) {
-            addError(agName, "illegal_move", "Position out of bounds: (" + targetX + "," + targetY + ")");
-            return false;
-        }
-
-        // Verificar si hay obstáculos (excepto estanterías que son destinos válidos)
-        if (grid[targetX][targetY] == CellType.BLOCKED) {
-            addError(agName, "route_blocked", "Position blocked: (" + targetX + "," + targetY + ")");
-            return false;
-        }
-
-        while (currentX != targetX || currentY != targetY) {
-
-            // Calcular el siguiente paso en X
-            int stepX = Integer.compare(targetX, currentX); // -1, 0 o 1
-            // Calcular el siguiente paso en Y
-            int stepY = Integer.compare(targetY, currentY); // -1, 0 o 1
-
-            int nextX = currentX + stepX;
-            int nextY = currentY + stepY;
-
-            // Verificar si hay otro robot en la posición de destino
-            boolean occupied = false;
-            for (Robot other : robots.values()) {
-                if (!other.getId().equals(agName) && other.getX() == nextX && other.getY() == nextY) {
-                    occupied = true;
-                    break;
-                }
+            // busca que el robot exista
+            Robot robot = robots.get(agName);
+            if (robot == null) {
+                addError(agName, "robot_not_found", "Robot " + agName + " not found");
+                return false;
             }
 
-            // Si la celda siguiente está ocupada o bloqueada, buscar alternativas
-            if (occupied || grid[nextX][nextY] == CellType.BLOCKED) {
+            int currentX = robot.getX();
+            int currentY = robot.getY();
 
-                boolean moved = false;
+            // Verificar límites del escenario
+            if (targetX < 0 || targetX >= GRID_WIDTH || targetY < 0 || targetY >= GRID_HEIGHT) {
+                addError(agName, "illegal_move", "Position out of bounds: (" + targetX + "," + targetY + ")");
+                return false;
+            }
 
-                // Lista de todas las celdas adyacentes posibles (incluyendo diagonales)
-                int[][] directions = {
+            // Verificar si hay obstáculos (excepto estanterías que son destinos válidos)
+            if (grid[targetX][targetY] == CellType.BLOCKED) {
+                addError(agName, "route_blocked", "Position blocked: (" + targetX + "," + targetY + ")");
+                return false;
+            }
+
+            while (currentX != targetX || currentY != targetY) {
+
+                // Calcular el siguiente paso en X
+                int stepX = Integer.compare(targetX, currentX); // -1, 0 o 1
+                // Calcular el siguiente paso en Y
+                int stepY = Integer.compare(targetY, currentY); // -1, 0 o 1
+
+                int nextX = currentX + stepX;
+                int nextY = currentY + stepY;
+
+                // Verificar si hay otro robot en la posición de destino
+                boolean occupied = false;
+                for (Robot other : robots.values()) {
+                    if (!other.getId().equals(agName) && other.getX() == nextX && other.getY() == nextY) {
+                        occupied = true;
+                        break;
+                    }
+                }
+
+                // Si la celda siguiente está ocupada o bloqueada, buscar alternativas
+                if (occupied || grid[nextX][nextY] == CellType.BLOCKED) {
+
+                    boolean moved = false;
+
+                    // Lista de todas las celdas adyacentes posibles (incluyendo diagonales)
+                    int[][] directions = {
                         {1, 0}, {-1, 0}, {0, 1}, {0, -1}, // ortogonales
                         {1, 1}, {1, -1}, {-1, 1}, {-1, -1} // diagonales
-                };
+                    };
 
-                double minDistance = Double.MAX_VALUE;
-                int bestX = currentX;
-                int bestY = currentY;
+                    double minDistance = Double.MAX_VALUE;
+                    int bestX = currentX;
+                    int bestY = currentY;
 
-                for (int[] d : directions) {
-                    int altX = currentX + d[0];
-                    int altY = currentY + d[1];
+                    for (int[] d : directions) {
+                        int altX = currentX + d[0];
+                        int altY = currentY + d[1];
 
-                    // Verificar límites y que no sea bloqueada
-                    if (altX >= 0 && altX < GRID_WIDTH &&
-                        altY >= 0 && altY < GRID_HEIGHT &&
-                        grid[altX][altY] != CellType.BLOCKED) {
+                        // Verificar límites y que no sea bloqueada
+                        if (altX >= 0 && altX < GRID_WIDTH
+                                && altY >= 0 && altY < GRID_HEIGHT
+                                && grid[altX][altY] != CellType.BLOCKED) {
 
-                        // Verificar ocupación
-                        boolean altOccupied = false;
-                        for (Robot other : robots.values()) {
-                            if (!other.getId().equals(agName) && other.getX() == altX && other.getY() == altY) {
-                                altOccupied = true;
-                                break;
+                            // Verificar ocupación
+                            boolean altOccupied = false;
+                            for (Robot other : robots.values()) {
+                                if (!other.getId().equals(agName) && other.getX() == altX && other.getY() == altY) {
+                                    altOccupied = true;
+                                    break;
+                                }
                             }
-                        }
 
-                        
-                        // Busca que dirección es la más optima para llegar al destino, siempre que esta esté disponible
-                        if (!altOccupied) {
-                            double distance = Math.sqrt(Math.pow(targetX - altX, 2) + Math.pow(targetY - altY, 2)); 
-                            if (distance < minDistance) {
-                                minDistance = distance;
-                                bestX = altX;
-                                bestY = altY;
-                                moved = true;
+                            // Busca que dirección es la más optima para llegar al destino, siempre que esta esté disponible
+                            if (!altOccupied) {
+                                double distance = Math.sqrt(Math.pow(targetX - altX, 2) + Math.pow(targetY - altY, 2));
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    bestX = altX;
+                                    bestY = altY;
+                                    moved = true;
+                                }
                             }
                         }
                     }
-                }
 
-                if (moved) {
-                    nextX = bestX;
-                    nextY = bestY;
-                } else {
-                    // No hay alternativas libres: esperar
-                    if (view != null) {
-                        view.logMessage("⏳ " + agName + " waiting, no alternative path");
+                    if (moved) {
+                        nextX = bestX;
+                        nextY = bestY;
+                    } else {
+                        // No hay alternativas libres: esperar
+                        if (view != null) {
+                            view.logMessage("⏳ " + agName + " waiting, no alternative path");
+                        }
+                        Thread.sleep(200);
+                        continue;
                     }
-                    Thread.sleep(200);
-                    continue;
                 }
+
+                // Mover al robot
+                robot.setPosition(nextX, nextY);
+
+                // Log a la consola de la GUI
+                if (view != null) {
+                    view.logMessage(String.format("➡️  %s moved to (%d,%d)", agName, nextX, nextY));
+                }
+
+                // Actualizar percepción
+                removePerceptsByUnif(agName, Literal.parseLiteral("robot_at(_,_)"));
+                addPercept(agName, Literal.parseLiteral("robot_at(" + nextX + "," + nextY + ")"));
+
+                if (view != null) {
+                    view.update();
+                }
+
+                currentX = nextX;
+                currentY = nextY;
+
+                Thread.sleep(200); // simular tiempo de movimiento
             }
 
-            // Mover al robot
-            robot.setPosition(nextX, nextY);
+            return true;
 
-            // Log a la consola de la GUI
-            if (view != null) {
-                view.logMessage(String.format("➡️  %s moved to (%d,%d)", agName, nextX, nextY));
-            }
-
-            // Actualizar percepción
-            removePerceptsByUnif(agName, Literal.parseLiteral("robot_at(_,_)"));
-            addPercept(agName, Literal.parseLiteral("robot_at(" + nextX + "," + nextY + ")"));
-
-            if (view != null) {
-                view.update();
-            }
-
-            currentX = nextX;
-            currentY = nextY;
-
-            Thread.sleep(200); // simular tiempo de movimiento
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
         }
-
-        return true;
-
-    } catch (Exception e) {
-        e.printStackTrace();
-        return false;
     }
-}
 
     /**
      * Acción: pickup(ContainerId) Recoge un contenedor
@@ -885,4 +860,3 @@ public class WarehouseArtifact extends Environment {
                 elapsedTime, totalContainersProcessed, pendingContainers.size(), totalErrors);
     }
 }
-
