@@ -319,6 +319,7 @@ public class WarehouseArtifact extends Environment {
         }
     }
 
+    //Esta es la función antigua de ExecuteMoveTo sin los movimientos en caso de que esté ocupado el sitio a donde se dirige, por si deja de funcionar la otra
     // /**
     //  * Acción: move_to(X, Y) Mueve el robot a la posición especificada
     //  */
