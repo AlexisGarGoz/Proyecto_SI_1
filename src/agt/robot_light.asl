@@ -45,23 +45,23 @@ carrying(none).      // Contenedor que está cargando
     .wait(1000);
     
     .print("➡️  Movimiento 1: Ir al área de entrada (1,1)");
-    move_to_safe(1, 1);
+    move_to(1, 1);
     .wait(2000);
     
     .print("➡️  Movimiento 2: Ir al área de clasificación (5,1)");
-    move_to_safe(5, 1);
+    move_to(5, 1);
     .wait(2000);
     
     .print("➡️  Movimiento 3: Ir a zona de estanterías pequeñas (12,3)");
-    move_to_safe(12, 3);
+    move_to(12, 3);
     .wait(2000);
     
     .print("➡️  Movimiento 4: Explorar más estanterías (16,3)");
-    move_to_safe(16, 3);
+    move_to(16, 3);
     .wait(2000);
     
     .print("➡️  Movimiento 5: Volver a posición intermedia (8,5)");
-    move_to_safe(8, 5);
+    move_to(8, 5);
     .wait(2000);
     
     .print("✅ Prueba de movimientos completada. Robot funcionando correctamente.");
@@ -82,7 +82,7 @@ carrying(none).      // Contenedor que está cargando
     .print("📍 Llegado a destino: (",DX,",",DY,")").
 
 +!moverse(DX,DY) : true <-
-    move_to_safe(DX,DY);  // llama al artifact Java
+    move_to(DX,DY);  // llama al artifact Java
     .wait(200);
     !moverse(DX,DY).
 
@@ -135,7 +135,7 @@ carrying(none).      // Contenedor que está cargando
     
     // Fase 1: Ir al área de entrada (donde están los contenedores)
     .print("📍 Fase 1: Moviéndose al área de entrada");
-    move_to_safe(1, 1);
+    move_to(1, 1);
     .wait(500);
     
     // Fase 2: Recoger el contenedor
@@ -164,7 +164,7 @@ carrying(none).      // Contenedor que está cargando
 // Navegar a la estantería (simplificado - zona de estanterías)
 +!navigate_to_shelf(ShelfId) : true <-
     // Las estanterías están en la zona x=10-18, y=2-12
-    move_to_safe(12, 3);  // Posición aproximada en zona de estanterías pequeñas
+    move_to(12, 3);  // Posición aproximada en zona de estanterías pequeñas
     .wait(500).
 
 /* ============================================================================
