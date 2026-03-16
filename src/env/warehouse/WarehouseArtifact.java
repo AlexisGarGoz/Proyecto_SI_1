@@ -555,6 +555,9 @@ public class WarehouseArtifact extends Environment {
 
             // Verificar capacidad
             if (!robot.canCarry(container)) {
+                robot.setBusy(false);
+                robot.setCurrentTask(null);
+                pendingContainers.offer(container); // Devolver contenedor a la cola
                 if (container.getWeight() > robot.getMaxWeight()) {
                     addError(agName, "container_too_heavy",
                             "Container " + containerId + " is too heavy for " + agName);
@@ -624,6 +627,8 @@ public class WarehouseArtifact extends Environment {
             // Depositar
             shelf.store(container);
             robot.drop();
+            robot.setBusy(false);
+            robot.setCurrentTask(null);
             container.setAssignedShelf(shelfId);
 
             totalContainersProcessed++;

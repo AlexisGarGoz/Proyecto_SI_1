@@ -34,3 +34,39 @@ system_start_time(0).
 max_errors_per_minute(10).
 max_consecutive_errors(5).
 
+/* Contador de contenedores recibidos */
+total_containers_received(0).
+
+/* ============================================================================
+ * PLANES PRINCIPALES
+ * ============================================================================ */
+
+!start.
+
++!start : true <-
+    .print("🛡️ [SUPERVISOR] Sistema de supervisión iniciado");
+    !monitor_loop.
+
+// Bucle periódico de reporte de estado (cada 30 segundos)
++!monitor_loop : true <-
+    .wait(30000);
+    ?total_containers_received(N);
+    ?total_errors(E);
+    .print("📊 [SUPERVISOR] Estado del sistema: ", N, " contenedores recibidos, ", E, " errores totales");
+    !monitor_loop.
+
+/* ============================================================================
+ * REACCIÓN A EVENTOS
+ * ============================================================================ */
+
+// Registrar llegada de nuevo contenedor
++new_container(CId) : total_containers_received(N) <-
+    N1 = N + 1;
+    -+total_containers_received(N1);
+    .print("🔍 [SUPERVISOR] Nuevo contenedor detectado #", N1, ": ", CId).
+
+// Reaccionar a errores propios (errores generados por el supervisor mismo si existieran)
++error(ErrorType, Data) : total_errors(E) <-
+    E1 = E + 1;
+    -+total_errors(E1);
+    .print("⚠️ [SUPERVISOR] Error registrado #", E1, ": ", ErrorType, " - ", Data).

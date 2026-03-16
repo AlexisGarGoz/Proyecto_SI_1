@@ -39,25 +39,17 @@ pending_containers(0).
     get_container_info(CId);
     true.
 
-// 2. Recibir info y clasificar
+// 2. Recibir info del contenedor y clasificarlo según peso
 +container_info(CId, W, H, Weight, Type) : true <-
-    .print("Info: ", CId, " - ", Weight, "kg");
-    +pending_container(CId, Weight).
-
-
-+container_info(CId, W, H, Weight, Type) : true <-
-    .print("Clasificando ", CId);
-    
-    // Asignar a robot apropiado
+    .print("📋 Info recibida: ", CId, " - ", Weight, "kg, ", W, "x", H, ", tipo: ", Type);
+    +pending_container(CId, Weight);
     if (Weight <= 10) {
-        .print("Asignando a robot_light");
-        // Nota: Esta es una simplificación
-        // El scheduler debería verificar disponibilidad
+        .print("  ➜ Clasificado para robot_light");
     } else {
         if (Weight <= 30) {
-            .print("Asignando a robot_medium");
+            .print("  ➜ Clasificado para robot_medium");
         } else {
-            .print("Asignando a robot_heavy");
+            .print("  ➜ Clasificado para robot_heavy");
         }
     }.
 
