@@ -87,16 +87,33 @@ carrying(none).      // Contenedor que está cargando
     !moverse(DX,DY).
 
 
-/* Posiciones de las estanterías (deben coincidir con WarehouseArtifact) */
-shelf_pos(shelf_1, 10, 2).
-shelf_pos(shelf_2, 12, 2).
-shelf_pos(shelf_3, 14, 2).
-shelf_pos(shelf_4, 16, 2).
-shelf_pos(shelf_5, 10, 6).
-shelf_pos(shelf_6, 13, 6).
-shelf_pos(shelf_7, 16, 6).
-shelf_pos(shelf_8, 10, 10).
-shelf_pos(shelf_9, 14, 10).
+// 3. Reaccionar a tarea
++task(CId, ShelfId) : true <-
+    .print("Tarea recibida: ", CId, " -> ", ShelfId);
+    get_container_info(CId);
+    // Por ahora, solo registrar
+    true.
+
+
+    +task(CId, ShelfId) : true <-
+    .print("Ejecutando tarea: ", CId);
+    
+    // Paso 1: Ir al contenedor (simplificado)
+    moverse(10, 10);  // Posición aproximada
+    .wait(1000);
+    
+    // Paso 2: Recoger
+    pickup(CId);
+    .wait(1000);
+    
+    // Paso 3: Ir a estantería (simplificado)
+    moverse(10, 2);
+    .wait(1000);
+    
+    // Paso 4: Depositar
+    drop_at(ShelfId).
+
+
 
 /* ============================================================================
  * MANEJO DE TAREAS ASIGNADAS
@@ -144,13 +161,11 @@ shelf_pos(shelf_9, 14, 10).
     -+carrying(none);
     -task(CId, ShelfId).
 
-// Navegar a la estantería usando su posición real
-+!navigate_to_shelf(ShelfId) : shelf_pos(ShelfId, SX, SY) <-
-    move_to(SX, SY).
-
+// Navegar a la estantería (simplificado - zona de estanterías)
 +!navigate_to_shelf(ShelfId) : true <-
-    .print("⚠️ Posición desconocida para estantería: ", ShelfId);
-    move_to(12, 2).  // Posición de respaldo en zona de estanterías
+    // Las estanterías están en la zona x=10-18, y=2-12
+    move_to(12, 3);  // Posición aproximada en zona de estanterías pequeñas
+    .wait(500).
 
 /* ============================================================================
  * MANEJO DE ERRORES

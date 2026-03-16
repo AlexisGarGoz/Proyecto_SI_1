@@ -16,17 +16,6 @@ state(idle).         // Estados posibles: idle, moving, picking, carrying, dropp
 position(3,3).       // Posición inicial
 carrying(none).      // Contenedor que está cargando
 
-/* Posiciones de las estanterías (deben coincidir con WarehouseArtifact) */
-shelf_pos(shelf_1, 10, 2).
-shelf_pos(shelf_2, 12, 2).
-shelf_pos(shelf_3, 14, 2).
-shelf_pos(shelf_4, 16, 2).
-shelf_pos(shelf_5, 10, 6).
-shelf_pos(shelf_6, 13, 6).
-shelf_pos(shelf_7, 16, 6).
-shelf_pos(shelf_8, 10, 10).
-shelf_pos(shelf_9, 14, 10).
-
 /* CARACTERÍSTICAS ESPECIALES:
  * - Único robot capaz de manejar contenedores > 30kg
  * - Puede transportar contenedores hasta 2×3
@@ -136,13 +125,13 @@ shelf_pos(shelf_9, 14, 10).
     -+carrying(none);
     -task(CId, ShelfId).
 
-// Navegar a la estantería usando su posición real
-+!navigate_to_shelf(ShelfId) : shelf_pos(ShelfId, SX, SY) <-
-    move_to(SX, SY).
-
+// Navegar a la estantería (zona de estanterías grandes)
 +!navigate_to_shelf(ShelfId) : true <-
-    .print("⚠️ [HEAVY] Posición desconocida para estantería: ", ShelfId);
-    move_to(10, 10).  // Posición de respaldo en zona de estanterías grandes
+    // Estanterías grandes están en y=10-12
+    move_to(12, 10);
+    .wait(1000);  // Movimiento más lento por el peso
+    move_to(14, 11);
+    .wait(1000).
 
 /* ============================================================================
  * MANEJO DE ERRORES
