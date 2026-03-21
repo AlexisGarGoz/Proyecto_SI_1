@@ -33,4 +33,3 @@ system_start_time(0).
 /* Umbral de alerta */
 max_errors_per_minute(10).
 max_consecutive_errors(5).
-

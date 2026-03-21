@@ -23,38 +23,38 @@ carrying(none).      // Contenedor que está cargando
 
 // Plan inicial: Arrancar el robot y hacer pruebas de movimiento
 +!start : true <-
-    .print("🤖 Robot medio iniciado - Capacidad: 30kg, 1x2");
-    .print("🔍 Iniciando secuencia de prueba de movimientos...");
-    -+state(testing);
-    !test_movement;
+    .print("Robot medio iniciado - Capacidad: 30kg, 1x2");
+    //.print("Iniciando secuencia de prueba de movimientos...");
+    // -+state(testing);
+    // !test_movement;
     !work_cycle.
 
 // Secuencia de prueba de movimientos (ruta diferente al robot ligero)
 +!test_movement : true <-
-    .print("📍 Posición inicial: (2,3)");
+    .print("Posición inicial: (2,3)");
     .wait(1500);
     
-    .print("➡️  Movimiento 1: Ir al área de entrada (2,1)");
-    move_to_safe(2, 1);
+    .print("Movimiento 1: Ir al área de entrada (2,1)");
+    move_to(2, 1);
     .wait(2500);
     
-    .print("➡️  Movimiento 2: Patrol por área de clasificación (6,1)");
-    move_to_safe(6, 1);
+    .print("Movimiento 2: Patrol por área de clasificación (6,1)");
+    move_to(6, 1);
     .wait(2500);
     
-    .print("➡️  Movimiento 3: Ir a zona de estanterías medianas (13,7)");
-    move_to_safe(13, 7);
+    .print("Movimiento 3: Ir a zona de estanterías medianas (13,7)");
+    move_to(13, 7);
     .wait(2500);
     
-    .print("➡️  Movimiento 4: Explorar zona central (10,5)");
-    move_to_safe(10, 5);
+    .print("Movimiento 4: Explorar zona central (10,5)");
+    move_to(10, 5);
     .wait(2500);
     
-    .print("➡️  Movimiento 5: Regresar a zona intermedia (7,4)");
-    move_to_safe(7, 4);
+    .print("Movimiento 5: Regresar a zona intermedia (7,4)");
+    move_to(7, 4);
     .wait(2500);
     
-    .print("✅ Prueba de movimientos completada. Robot funcionando correctamente.");
+    .print("Prueba de movimientos completada. Robot funcionando correctamente.");
     -+state(idle).
 
 // Ciclo de trabajo principal
@@ -74,76 +74,84 @@ carrying(none).      // Contenedor que está cargando
 
 // Recibir tarea del scheduler
 +task(CId, ShelfId) : state(idle) <-
-    .print("✅ Tarea asignada: Transportar ", CId, " a ", ShelfId);
+    .print("[MEDIUM] Tarea asignada: Transportar ", CId, " a ", ShelfId);
     -+state(working);
     -+carrying(CId);
     !execute_task(CId, ShelfId).
 
 +task(CId, ShelfId) : not state(idle) <-
-    .print("⚠️ Ocupado, no puedo aceptar tarea: ", CId).
+    .print("[MEDIUM] Ocupado, no puedo aceptar tarea: ", CId).
 
 // Ejecutar la tarea completa
 +!execute_task(CId, ShelfId) : true <-
-    .print("🚀 Iniciando tarea: ", CId);
+    .print("[MEDIUM] Iniciando tarea: ", CId);
     
     // Fase 1: Ir al área de entrada
-    .print("📍 Fase 1: Moviéndose al área de entrada");
-    move_to_safe(1, 1);
+    .print("[MEDIUM] Fase 1: Moviéndose al área de entrada");
+    move_to(1, 1);
     .wait(600);  // Robot medio es más lento
     
     // Fase 2: Recoger el contenedor
-    .print("📦 Fase 2: Recogiendo contenedor ", CId);
+    .print("[MEDIUM] Fase 2: Recogiendo contenedor ", CId);
     -+state(picking);
     pickup(CId);
     .wait(600);
     
     // Fase 3: Navegar hacia la estantería
-    .print("🚚 Fase 3: Transportando a estantería ", ShelfId);
+    .print("[MEDIUM] Fase 3: Transportando a estantería ", ShelfId);
     -+state(carrying);
     !navigate_to_shelf(ShelfId);
     
     // Fase 4: Depositar el contenedor
-    .print("📥 Fase 4: Depositando en ", ShelfId);
+    .print("[MEDIUM] Fase 4: Depositando en ", ShelfId);
     -+state(dropping);
     drop_at(ShelfId);
     .wait(600);
     
     // Fase 5: Completar y volver a idle
-    .print("✨ Tarea completada: ", CId);
+    .print("[MEDIUM] Tarea completada: ", CId);
     -+state(idle);
     -+carrying(none);
-    -task(CId, ShelfId).
+    -task(CId, ShelfId);
 
-// Navegar a la estantería (zona de estanterías medianas)
+    // Fase 6: Vuelve a su posición inicial
+    .print("[MEDIUM] Volvindo a su posicion inicial: ");
+    move_to(2,3).
+
 +!navigate_to_shelf(ShelfId) : true <-
-    // Estanterías medianas están en y=6-7
-    move_to_safe(12, 6);
-    .wait(600).
+    .print("Buscando coordenadas de ", ShelfId);
+    get_shelf_info(ShelfId); 
+    .wait(100); 
+    ?shelf_pos(ShelfId, X, Y); 
+    .print("Coordenadas obtenidas: ", X, ",", Y);
+    move_to(X, Y);
+    .wait(1000);
+    -shelf_pos(ShelfId, X, Y).
 
 /* ============================================================================
  * MANEJO DE ERRORES
  * ============================================================================ */
 
 +error(container_too_heavy, Data) : carrying(CId) <-
-    .print("❌ ERROR: Contenedor muy pesado - ", Data);
+    .print("[MEDIUM] ERROR: Contenedor muy pesado - ", Data);
     -+state(idle);
     -+carrying(none);
     -task(CId, _).
 
 +error(container_too_big, Data) : carrying(CId) <-
-    .print("❌ ERROR: Contenedor muy grande - ", Data);
+    .print("[MEDIUM] ERROR: Contenedor muy grande - ", Data);
     -+state(idle);
     -+carrying(none);
     -task(CId, _).
 
 +error(ErrorType, Data) : true <-
-    .print("⚠️ Error detectado: ", ErrorType, " - ", Data);
+    .print("[MEDIUM] Error detectado: ", ErrorType, " - ", Data);
     -+state(idle);
     -+carrying(none).
 
 +picked(CId) : true <-
-    .print("✓ Contenedor ", CId, " recogido correctamente").
+    .print("[MEDIUM] Contenedor ", CId, " recogido correctamente").
 
 +stored(CId, ShelfId) : true <-
-    .print("✓ Contenedor ", CId, " almacenado en ", ShelfId).
+    .print("[MEDIUM] Contenedor ", CId, " almacenado en ", ShelfId).
 
