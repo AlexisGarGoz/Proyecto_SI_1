@@ -113,7 +113,7 @@ public class WarehouseArtifact extends Environment {
             }
         }
 
-        // Zona de entrada (arriba izquierda) -  3 filas para admitir contenedores 2x3
+        // Zona de entrada (arriba izquierda) - 3 filas para admitir contenedores 2x3
         for (int x = 0; x < 3; x++) {
             for (int y = 0; y < 3; y++) {
                 grid[x][y] = CellType.ENTRANCE;
@@ -288,6 +288,7 @@ public class WarehouseArtifact extends Environment {
         return container;
     }
 
+    //Aquí defines que hace al encontrar x nombres
     //Aquí defines que hace al encontrar x nombres
     @Override
     public boolean executeAction(String agName, Structure action) {
@@ -528,6 +529,14 @@ public class WarehouseArtifact extends Environment {
 
                 // Mover al robot
                 robot.setPosition(nextX, nextY);
+
+                if (view != null) {
+                    view.logMessage(String.format("➡️  %s moved to (%d,%d)", agName, nextX, nextY));
+                }
+
+                // Actualizar percepción
+                removePerceptsByUnif(agName, Literal.parseLiteral("robot_at(_,_)"));
+                addPercept(agName, Literal.parseLiteral("robot_at(" + nextX + "," + nextY + ")"));
 
                 // Log a la consola de la GUI
                 if (view != null) {
@@ -885,9 +894,8 @@ private boolean executeGetFreeShelf(String agName, Structure action) {
     private boolean executeScanSurroundings(String agName, Structure action) {
         try {
             Robot robot = robots.get(agName);
-            if (robot == null) {
+            if (robot == null)
                 return false;
-            }
 
             int x = robot.getX();
             int y = robot.getY();

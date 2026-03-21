@@ -292,7 +292,7 @@ containers_received(0).
 
 /* ============================================================================
  * MANEJO DE ERRORES DEL ENTORNO
- * ===============================F============================================= */
+ * ============================================================================ */
 
 // Sin estanterías disponibles: liberar el robot y volver a encolar
 +error(no_shelf_available, Data) : assigning(CId, Robot) <-
@@ -303,3 +303,4 @@ containers_received(0).
 // Cualquier otro error
 +error(ErrorType, Data) : true <-
     .print("[SCHEDULER] ERROR recibido: ", ErrorType, " | datos: ", Data).
+
