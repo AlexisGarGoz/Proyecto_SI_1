@@ -113,9 +113,9 @@ public class WarehouseArtifact extends Environment {
             }
         }
 
-        // Zona de entrada (arriba izquierda)
+        // Zona de entrada (arriba izquierda) - 3 filas para admitir contenedores 2x3
         for (int x = 0; x < 3; x++) {
-            for (int y = 0; y < 2; y++) {
+            for (int y = 0; y < 3; y++) {
                 grid[x][y] = CellType.ENTRANCE;
             }
         }
@@ -283,7 +283,7 @@ public class WarehouseArtifact extends Environment {
         }
 
         Container container = new Container(id, size[0], size[1], weight, type);
-        container.setPosition(1, 1); // Posición inicial en zona de entrada
+        container.setPosition(1, 0); // Posición inicial en zona de entrada (permite 2x3 sin desbordar)
 
         return container;
     }

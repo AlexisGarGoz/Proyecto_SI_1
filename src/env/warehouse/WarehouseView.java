@@ -341,15 +341,17 @@ public class WarehouseView extends JFrame {
                         containerColor = new Color(150, 150, 255);
                 }
                 
+                int cw = container.getWidth() * CELL_SIZE - 4;
+                int ch = container.getHeight() * CELL_SIZE - 4;
                 g.setColor(containerColor);
-                g.fillRect(px + 10, py + 10, CELL_SIZE - 20, CELL_SIZE - 20);
+                g.fillRect(px + 2, py + 2, cw, ch);
                 g.setColor(Color.BLACK);
-                g.drawRect(px + 10, py + 10, CELL_SIZE - 20, CELL_SIZE - 20);
+                g.drawRect(px + 2, py + 2, cw, ch);
                 
                 // Dibujar ID
                 g.setFont(new Font("Arial", Font.PLAIN, 8));
                 String shortId = container.getId().replace("container_", "C");
-                g.drawString(shortId, px + 12, py + 22);
+                g.drawString(shortId, px + 4, py + 12);
             }
         }
         
