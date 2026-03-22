@@ -296,9 +296,9 @@ public class WarehouseArtifact extends Environment {
             String actionName = action.getFunctor();
 
             switch (actionName) {
-                case "get_shelf_info": //! Para tener la dirección de una estanteria
+                case "get_shelf_info": // nos genera una creencia con la localización de la estantería deseada
                     return executeGetShelfInfo(agName, action);
-                case "get_container_location": 
+                case "get_container_location": // nos genera una creencia con la localización del contenedor deseado
                     return executeGetContainerLocation(agName, action);
                 case "move_to":
                     return executeMoveTo(agName, action);
@@ -324,105 +324,40 @@ public class WarehouseArtifact extends Environment {
         }
     }
 
-    //TODO NUEVA INFO
+    
+    /**
+     * Acción: get_shelf_info("shelf_X")
+     * Obtiene la posición de la estantería indicada y crea una percepción en el agente.
+     * Si la estantería no existe, genera un error para el agente.
+     */
     private boolean executeGetShelfInfo(String agName, Structure action) {
-        // Obtenemos el ID de la estantería (ej: "shelf_9")
+        // Extraemos el ID de la estantería de la acción y eliminamos comillas
         String shelfId = action.getTerm(0).toString().replace("\"", "");
+        
+        // Buscamos la estantería en el mapa de estanterías
         Shelf s = shelves.get(shelfId);
-
+        
         if (s != null) {
-            // Añadimos una percepción temporal para este robot con las coordenadas
-            // Esto crea una creencia en el robot: shelf_pos("shelf_9", 15, 10)
+            // Si se encuentra, creamos una percepción en el agente con la posición
+            // shelf_pos("shelf_X", X, Y)
             addPercept(agName, Literal.parseLiteral(
-                    "shelf_pos(\"" + shelfId + "\"," + s.getX() + "," + s.getY() + ")"
+                "shelf_pos(\"" + shelfId + "\"," + s.getX() + "," + s.getY() + ")"
             ));
+            // Acción ejecutada correctamente
             return true;
         } else {
+            // Si no se encuentra, registramos un error para el agente
             addError(agName, "shelf_not_found", shelfId);
+            // Indicamos que la acción falló
             return false;
         }
     }
 
-    //Esta es la función antigua de ExecuteMoveTo sin los movimientos en caso de que esté ocupado el sitio a donde se dirige, por si deja de funcionar la otra
-    // /**
-    //  * Acción: move_to(X, Y) Mueve el robot a la posición especificada
-    //  */
-    // private boolean executeMoveTo(String agName, Structure action) {
-    //     try {
-    //         //ubica a donde queremos mover al robot
-    //         int targetX = (int) ((NumberTerm) action.getTerm(0)).solve();
-    //         int targetY = (int) ((NumberTerm) action.getTerm(1)).solve();
-    //         //busca que el robot exista
-    //         Robot robot = robots.get(agName);
-    //         if (robot == null) {
-    //             addError(agName, "robot_not_found", "Robot " + agName + " not found");
-    //             return false;
-    //         }
-    //         int currentX = robot.getX();
-    //         int currentY = robot.getY();
-    //         // Verificar límites del escenario
-    //         if (targetX < 0 || targetX >= GRID_WIDTH || targetY < 0 || targetY >= GRID_HEIGHT) {
-    //             addError(agName, "illegal_move", "Position out of bounds: (" + targetX + "," + targetY + ")");
-    //             return false;
-    //         }
-    //         // Verificar si hay obstáculos (excepto estanterías que son destinos válidos)
-    //         if (grid[targetX][targetY] == CellType.BLOCKED) {
-    //             addError(agName, "route_blocked", "Position blocked: (" + targetX + "," + targetY + ")");
-    //             return false;
-    //         }
-    //         while (currentX != targetX || currentY != targetY) {
-    //             // Calcular el siguiente paso en X
-    //             int stepX = Integer.compare(targetX, currentX); // -1, 0 o 1
-    //             // Calcular el siguiente paso en Y
-    //             int stepY = Integer.compare(targetY, currentY); // -1, 0 o 1
-    //             int nextX = currentX + stepX;
-    //             int nextY = currentY + stepY;
-    //             // Esperar si hay otro robot en la posición de destino
-    //             // Esto hay que cambiarlo
-    //             boolean occupied;
-    //             do {
-    //                 occupied = false;
-    //                 for (Robot other : robots.values()) {
-    //                     if (!other.getId().equals(agName) && other.getX() == targetX && other.getY() == targetY) {
-    //                         occupied = true;
-    //                         break;
-    //                     }
-    //                 }
-    //                 if (occupied) {
-    //                     if (view != null) {
-    //                         view.logMessage(
-    //                                 "⏳ " + agName + " waiting, position (" + targetX + "," + targetY + ") occupied");
-    //                     }
-    //                     Thread.sleep(200); // esperar 200 ms antes de volver a comprobar
-    //                 }
-    //             } while (occupied);
-    //             robot.setPosition(nextX, nextY);
-    //             // Log a la consola de la GUI
-    //             if (view != null) {
-    //                 view.logMessage(String.format("➡️  %s moved to (%d,%d)", agName, targetX, targetY));
-    //             }
-    //             // Actualizar percepción
-    //             removePerceptsByUnif(agName, Literal.parseLiteral("robot_at(_,_)"));
-    //             addPercept(agName, Literal.parseLiteral("robot_at(" + targetX + "," + targetY + ")"));
-    //             if (view != null) {
-    //                 view.update();
-    //             }
-    //             currentX = nextX;
-    //             currentY = nextY;
-    //             Thread.sleep(200); // simular tiempo de movimiento
-    //             // Actualizar percepción
-    //             removePerceptsByUnif(agName, Literal.parseLiteral("robot_at(_,_)"));
-    //             addPercept(agName, Literal.parseLiteral("robot_at(" + targetX + "," + targetY + ")"));
-    //         }
-    //         return true;
-    //     } catch (Exception e) {
-    //         e.printStackTrace();
-    //         return false;
-    //     }
-    // }
-    // /**
-    //  * Acción: move_to(X, Y) Mueve el robot a la posición especificada
-    //  */  
+    /**
+    * Acción: move_to(X, Y)
+    * Mueve al robot paso a paso hacia la posición indicada, evitando obstáculos y otros robots.
+    * Actualiza la percepción del robot con su nueva posición y simula su velocidad según el tipo de robot.
+    */
     private boolean executeMoveTo(String agName, Structure action) {
         try {
             // ubica a donde queremos mover al robot
@@ -556,7 +491,6 @@ public class WarehouseArtifact extends Environment {
                 currentX = nextX;
                 currentY = nextY;
 
-                //! Pa que los robots se muevan segun su velocidad
                 //Segun el tipo de robot que varíe la velocidad
                 if (robot.getSpeed() == 3) {
                     Thread.sleep(200);
@@ -827,30 +761,32 @@ public class WarehouseArtifact extends Environment {
     }
 
     /**
-     * Acción: get_container_location(ContainerId) Proporciona la ubicación
-     * actual (X, Y) del contenedor al agente.
+     * Acción: get_container_location(ContainerId)
+     * Obtiene la posición actual de un contenedor en el almacén y se la proporciona
+     * al agente como percepción, generando la creencia container_pos(ContainerId, X, Y).
+     * Si el contenedor no existe, se registra un error.
      */
     private boolean executeGetContainerLocation(String agName, Structure action) {
         try {
-            // 1. Obtener y limpiar el ID del contenedor del primer término de la acción
+            // Extraer y limpiar el ID del contenedor del primer término de la acción
             String containerId = action.getTerm(0).toString().replace("\"", "");
-
-            // 2. Buscar el contenedor en el mapa del almacén
+    
+            // Buscar el contenedor en el mapa de contenedores del almacén
             Container container = containers.get(containerId);
-
+    
             if (container != null) {
-                // 3. Eliminar percepciones de ubicación antiguas para este contenedor si existen
+                // Eliminar percepciones anteriores de este contenedor si existen
                 removePerceptsByUnif(agName, Literal.parseLiteral("container_pos(\"" + containerId + "\", _, _)"));
-
-                // 4. Añadir la percepción con las coordenadas actuales
-                // Esto genera una creencia como: container_pos("container_1", 1, 0)
+    
+                // Añadir nueva percepción con la ubicación actual del contenedor
+                // Esto crea una creencia en el agente: container_pos("container_X", X, Y)
                 addPercept(agName, Literal.parseLiteral(
                         "container_pos(\"" + containerId + "\"," + container.getX() + "," + container.getY() + ")"
                 ));
-
+    
                 return true;
             } else {
-                // Si el contenedor no existe, notificamos el error
+                // Contenedor no encontrado: registrar error para el agente
                 addError(agName, "container_not_found", containerId);
                 return false;
             }
@@ -860,68 +796,69 @@ public class WarehouseArtifact extends Environment {
         }
     }
 
-    /**
-     * Acción: get_free_shelf(ContainerId, RobotName) Busca una estantería libre
-     * filtrando por la zona de operación permitida para cada robot.
-     *
-     * * @param agName Nombre del agente que solicita la acción (normalmente el
-     * scheduler).
-     * @param action Estructura de la acción con los términos (ID Contenedor,
-     * Nombre Robot).
-     * @return true si encuentra una estantería válida en la zona
-     * correspondiente.
+   /**
+     * Acción: get_free_shelf(ContainerId, RobotName)
+     * Obtiene una estantería libre adecuada para un contenedor según la zona asignada
+     * al robot (light, medium, heavy) y la capacidad disponible.
+     * Genera la percepción free_shelf(ContainerId, ShelfId) para el agente scheduler.
+     * Si no se encuentra ninguna estantería válida, devuelve un error implícito.
      */
     private boolean executeGetFreeShelf(String agName, Structure action) {
         try {
-            // Extracción y limpieza de parámetros
+            // Obtener y limpiar los parámetros de entrada
             String containerId = action.getTerm(0).toString().replace("\"", "");
             String targetRobot = action.getTerm(1).toString().toLowerCase();
-
+    
+            // Recuperar el contenedor del almacén
             Container container = containers.get(containerId);
             if (container == null) {
-                view.logMessage("Error: Contenedor " + containerId + " no encontrado.");
+                view.logMessage("Error: contenedor " + containerId + " no encontrado.");
                 return false;
             }
-
-            // Filtrado inicial: ¿Cabe físicamente y hay hueco?
+    
+            // Filtrar estanterías que pueden almacenar el contenedor y que no estén llenas
             List<Shelf> capableShelves = shelves.values().stream()
                     .filter(s -> s.canStore(container) && !s.isFull())
                     .collect(Collectors.toList());
-
-            // Selección por Zonas Estrictas (Business Logic)
+    
+            // Selección de la estantería según la zona correspondiente al tipo de robot
             Shelf selectedShelf = null;
-
+    
             if (targetRobot.contains("light")) {
-                // Zona Light: Estanterías 1 a 4
+                // Robots light: buscar estanterías 1 a 4
                 selectedShelf = capableShelves.stream()
                         .filter(s -> s.getId().matches("shelf_[1-4]"))
                         .findFirst().orElse(null);
             } else if (targetRobot.contains("medium")) {
-                // Zona Medium: Estanterías 5 a 7
+                // Robots medium: buscar estanterías 5 a 7
                 selectedShelf = capableShelves.stream()
                         .filter(s -> s.getId().matches("shelf_[5-7]"))
                         .findFirst().orElse(null);
             } else if (targetRobot.contains("heavy")) {
-                // Zona Heavy: Estanterías 8 y 9
+                // Robots heavy: buscar estanterías 8 y 9
                 selectedShelf = capableShelves.stream()
                         .filter(s -> s.getId().matches("shelf_[8-9]"))
                         .findFirst().orElse(null);
             }
-
-            // Respuesta al Scheduler vía Percepción
+    
+            // Si se encuentra una estantería válida, enviar percepción al Scheduler
             if (selectedShelf != null) {
-                // Limpiamos percepciones antiguas para evitar duplicados en la mente del Scheduler
+                // Eliminar percepciones antiguas del contenedor para evitar duplicados
                 removePercept(agName, Literal.parseLiteral("free_shelf(\"" + containerId + "\", _)"));
-
-                // Añadimos la nueva percepción
-                addPercept(agName, Literal.parseLiteral("free_shelf(\"" + containerId + "\",\"" + selectedShelf.getId() + "\")"));
-
+    
+                // Añadir percepción con la estantería seleccionada
+                addPercept(agName, Literal.parseLiteral(
+                        "free_shelf(\"" + containerId + "\",\"" + selectedShelf.getId() + "\")"
+                ));
+    
                 return true;
             }
-
+    
+            // No se encontró estantería adecuada
             return false;
-
+    
         } catch (Exception e) {
+            // En caso de cualquier excepción, devolver false
             return false;
         }
     }
