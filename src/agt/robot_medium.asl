@@ -119,7 +119,7 @@ carrying(none).      // Contenedor que está cargando
     -+carrying(none);
     -task(CId, ShelfId);
     .print("[MEDIUM] Volviendo al origen...");
-    move_to(1,3);
+    move_to(2,3);
     .send(scheduler,tell,ready);
     -+state(idle).
 
