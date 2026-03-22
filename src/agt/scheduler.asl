@@ -1,306 +1,167 @@
 /*******************************************************************************
  * SCHEDULER - Agente Planificador y Coordinador de Tareas
- *
+ * 
  * Universidad de Vigo - Sistemas Inteligentes
  * Curso 2025-2026
- *
- * DISEÑO E IMPLEMENTACIÓN:
- *
- *   El scheduler actúa como cerebro central del sistema. Cuando el entorno
- *   genera un contenedor, notifica a TODOS los agentes con new_container(CId).
- *   El scheduler intercepta esa notificación, solicita información del
- *   contenedor al entorno (get_container_info), lo clasifica por prioridad
- *   y selecciona el robot más adecuado para transportarlo.
- *
- *   DECISIÓN 1 - Asignación directa con .send:
- *     En lugar de dejar que los robots soliciten tareas por su cuenta
- *     (request_task al Java), el scheduler asigna activamente usando
- *     .send(Robot, tell, task(CId, ShelfId)). Esto da al scheduler
- *     control total sobre qué robot recibe qué tarea.
- *
- *   DECISIÓN 2 - Sistema de prioridades (1=urgente > 2=frágil > 3=estándar):
- *     Los contenedores urgentes deben procesarse primero. Se implementa
- *     con planes ordenados: Jason prueba el primer plan aplicable para
- *     !try_assign_pending, de mayor a menor prioridad.
- *
- *   DECISIÓN 3 - Selección "best-fit" (robot más pequeño capaz):
- *     Para cada contenedor, se elige el robot más pequeño que pueda
- *     manejarlo. Así se preserve el robot_heavy (escaso y lento) para
- *     cargas grandes que solo él puede transportar.
- *     Orden de preferencia: robot_light → robot_medium → robot_heavy.
- *
- *   DECISIÓN 4 - Monitorización periódica con askOne:
- *     Cada 5 segundos, el scheduler consulta el estado actual de cada
- *     robot (state(S)) usando .send(Robot, askOne, ...). Esto permite
- *     detectar si un robot volvió a estar idle y asignar tareas pendientes,
- *     y también detectar robots ocupados por request_task externo.
- *
- *   DECISIÓN 5 - Flujo asíncrono en dos pasos:
- *     Para asignar una tarea: se llama a get_free_shelf(CId) al entorno
- *     y se espera la percepción +free_shelf(CId, ShelfId). Solo entonces
- *     se envía la tarea al robot. La creencia temporal assigning(CId, Robot)
- *     mantiene el contexto entre ambos pasos.
- *
+ * 
+ * RESPONSABILIDADES:
+ *   1. Recibir notificaciones de nuevos contenedores
+ *   2. Clasificar contenedores según peso, tamaño, tipo (urgente, frágil)
+ *   3. Asignar tareas a robots según sus capacidades
+ *   4. Optimizar la asignación para maximizar eficiencia
+ *   5. Gestionar colas de contenedores pendientes
+ *   6. Coordinar con supervisor para manejo de errores
+ * 
  ******************************************************************************/
 
 /* ============================================================================
  * CREENCIAS INICIALES - Base de Conocimiento
  * ============================================================================ */
 
-/* Capacidades de los robots - deben coincidir exactamente con warehouse.mas2j
- * Formato: robot_capacity(Nombre, PesoMax, AnchoMax, AltoMax, Velocidad) */
-robot_capacity(robot_light,  10, 1, 1, 3).
+/* Capacidades de los robots (debe coincidir con .mas2j) */
+robot_capacity(robot_light, 10, 1, 1, 3).    // (Robot, MaxPeso, MaxW, MaxH, Velocidad)
 robot_capacity(robot_medium, 30, 1, 2, 2).
 robot_capacity(robot_heavy, 100, 2, 3, 1).
 
-/* Disponibilidad de robots: todos disponibles al inicio */
+/* Estados de los robots */
 robot_available(robot_light).
 robot_available(robot_medium).
 robot_available(robot_heavy).
 
-/* Estadísticas */
-tasks_assigned(0).
-containers_received(0).
+/* Contadores y estadísticas */
+total_containers_received(0).
+total_tasks_assigned(0).
+pending_containers(0).
 
-/* ============================================================================
- * INICIO DEL AGENTE
- * ============================================================================ */
-
-!start.
-
-+!start : true <-
-    .print("[SCHEDULER] Iniciado. Sistema listo para coordinar tareas.");
-    !monitor_robots.   // Lanzar el bucle de monitorización de robots
-
-/* ============================================================================
- * BUCLE DE MONITORIZACIÓN DE ROBOTS
- *
- * Cada 5 segundos consulta el estado de cada robot con askOne.
- * askOne es un tipo de mensaje Jason que consulta la base de creencias del
- * robot receptor SIN modificarla: .send(Robot, askOne, state(S), S) devuelve
- * en S el valor actual de state(X) en ese robot.
- *
- * Se manejan dos casos para cada robot:
- *   a) Robot marcado como OCUPADO por el scheduler pero volvió a idle
- *      → restaurar disponibilidad e intentar asignar tareas pendientes.
- *   b) Robot marcado como DISPONIBLE pero está ocupado (cogió tarea por
- *      request_task externo) → marcarlo como no disponible para sincronizar.
- * ============================================================================ */
-
-+!monitor_robots : true <-
-    .wait(5000);
-    !check_robot_state(robot_light);
-    !check_robot_state(robot_medium);
-    !check_robot_state(robot_heavy);
-    !monitor_robots.   // Bucle infinito
-
-// Caso a: robot marcado como OCUPADO → comprobar si ya terminó
-+!check_robot_state(Robot) : not robot_available(Robot) <-
-    .send(Robot, askOne, state(S), S);
-    if (S == idle) {
-        .print("[SCHEDULER] ", Robot, " ha terminado su tarea. Ya disponible.");
-        +robot_available(Robot);
-        !try_assign_pending
-    }.
-
-// Caso b: robot marcado como DISPONIBLE → comprobar si está ocupado externamente
-+!check_robot_state(Robot) : robot_available(Robot) <-
-    .send(Robot, askOne, state(S), S);
-    if (S \== idle) {
-        .print("[SCHEDULER] ", Robot, " está ocupado por tarea externa. Sincronizando.");
-        -robot_available(Robot)
-    }.
-
-/* ============================================================================
- * RECEPCIÓN DE NUEVO CONTENEDOR
- *
- * El Java hace addPercept SIN nombre de agente → percepción global recibida
- * por TODOS los agentes. El scheduler reacciona pidiendo info al entorno.
- * ============================================================================ */
-
+// 1. Reaccionar a nuevo contenedor
 +new_container(CId) : true <-
-    ?containers_received(N);
-    N1 is N + 1;
-    -containers_received(N);
-    +containers_received(N1);
-    .print("[SCHEDULER] Nuevo contenedor detectado: ", CId, " (total recibidos: ", N1, ")");
-    get_container_info(CId).   // Solicitar detalles al entorno Java
+    .print("Nuevo contenedor: ", CId);
+    get_container_info(CId).
 
-/* ============================================================================
- * CLASIFICACIÓN DEL CONTENEDOR
- *
- * Al recibir container_info del entorno, determinamos su prioridad y lo
- * añadimos a la cola interna como pending_task(Prioridad, CId, W, H, Peso, Tipo).
- * Inmediatamente intentamos asignarlo si hay robot disponible.
- *
- * Eliminamos la percepción del belief base tras procesarla para evitar que
- * container_info de otros contenedores se acumule y cause confusión.
- * ============================================================================ */
 
+
+// 2. RECIBIR INFO Y CLASIFICAR (Versión optimizada para AgentSpeak)
+
+// CASO A: Peso para Robot Ligero y está disponible
++container_info(CId, W, H, Weight, Type) 
+    : Weight <= 10 & robot_available(robot_light) 
+    <-
+    .print("Asignando ", CId, " (", Weight, "kg) a robot_light");
+    -robot_available(robot_light);
+    +assigning(CId, robot_light);
+    get_free_shelf(CId).
+
+// CASO B: Peso para Robot Medio y está disponible
++container_info(CId, W, H, Weight, Type) 
+    : Weight <= 30 & robot_available(robot_medium) 
+    <-
+    .print("Asignando ", CId, " (", Weight, "kg) a robot_medium");
+    -robot_available(robot_medium);
+    +assigning(CId, robot_medium);
+    get_free_shelf(CId).
+
+// CASO C: Peso para Robot Pesado y está disponible
++container_info(CId, W, H, Weight, Type) 
+    : Weight <= 100 & robot_available(robot_heavy) 
+    <-
+    .print("Asignando ", CId, " (", Weight, "kg) a robot_heavy");
+    -robot_available(robot_heavy);
+    +assigning(CId, robot_heavy);
+    get_free_shelf(CId).
+
+// CASO D: Comodín (Fallback) - Si ningún plan anterior se ejecutó
+// (Porque los robots están ocupados o el peso no encaja)
 +container_info(CId, W, H, Weight, Type) : true <-
-    -container_info(CId, W, H, Weight, Type);   // Limpiar percepción procesada
-    !get_priority(Type, Priority);
-    .print("[SCHEDULER] Clasificado ", CId,
-           " | peso=", Weight, "kg | tam=", W, "x", H,
-           " | tipo=", Type, " | prioridad=", Priority);
-    +pending_task(Priority, CId, W, H, Weight, Type);
-    !try_assign_pending.
+    .print("No hay robots disponibles para ", CId, ". Añadiendo a cola de espera.");
+    +pending_container(CId, Weight).
 
-/* Plan auxiliar: devuelve la prioridad según el tipo de contenedor.
- * DECISIÓN: urgent tiene prioridad máxima (1), fragile media (2), standard baja (3).
- * Se usa ordenación de planes de Jason: el primer plan con cabeza que unifique gana. */
-+!get_priority("urgent",   1) <- true.
-+!get_priority("fragile",  2) <- true.
-+!get_priority(_,          3) <- true.   // Cualquier otro tipo → estándar
 
-/* ============================================================================
- * INTENTO DE ASIGNACIÓN DE TAREA
- *
- * DECISIÓN: usamos tres planes ordenados por prioridad en la cabeza.
- * Jason selecciona el PRIMER plan cuyo contexto sea verdadero. Como los
- * planes se definen de mayor a menor prioridad, los urgentes siempre se
- * intentan asignar antes que los estándar, sin necesidad de ordenar una lista.
- * ============================================================================ */
 
-// Prioridad 1: contenedores URGENTES primero
-+!try_assign_pending : pending_task(1, CId, W, H, Weight, Type) <-
-    .print("[SCHEDULER] >>> URGENTE en cola: ", CId, ". Intentando asignar...");
-    !assign_container(1, CId, W, H, Weight, Type).
+// 3. Cuando Java te contesta con la estantería:
++free_shelf(CId, SId) : assigning(CId, Robot) <- 
+    .send(Robot, tell, task(CId, SId)); // <--- AQUÍ MANDAS LA ORDEN REAL
+    -assigning(CId, Robot);             // Limpias tu memoria temporal
+    .print("Orden enviada a ", Robot, " para llevar ", CId, " a ", SId).
 
-// Prioridad 2: contenedores FRAGILES segundo
-+!try_assign_pending : pending_task(2, CId, W, H, Weight, Type) <-
-    .print("[SCHEDULER] >>> FRAGIL en cola: ", CId, ". Intentando asignar...");
-    !assign_container(2, CId, W, H, Weight, Type).
 
-// Prioridad 3: contenedores ESTÁNDAR
-+!try_assign_pending : pending_task(3, CId, W, H, Weight, Type) <-
-    .print("[SCHEDULER] >>> Estandar en cola: ", CId, ". Intentando asignar...");
-    !assign_container(3, CId, W, H, Weight, Type).
+// 4. Cuando un robot manda "ready", lo volvemos a poner en la lista de disponibles
++ready[source(Robot)] : true <-
+    .print("El robot ", Robot, " está libre. Revisando cola de espera...");
+    +robot_available(Robot); // Recupera la creencia de disponibilidad
+    !revisar_cola.           // Crea un objetivo para mirar si hay cajas pendientes  
 
-// Sin tareas pendientes: nada que hacer
-+!try_assign_pending : true <-
-    .print("[SCHEDULER] No hay tareas pendientes en cola.").
 
-/* ============================================================================
- * ASIGNACIÓN: seleccionar el mejor robot y buscar estantería libre
- *
- * Dos pasos:
- *   1. Encontrar el mejor robot disponible → !find_best_robot
- *   2. Si hay robot: pedimos estantería al entorno con get_free_shelf(CId)
- *      La percepción +free_shelf(CId, ShelfId) se procesará en otro plan.
- *      Guardamos assigning(CId, Robot) como "estado temporal" entre ambos pasos.
- * ============================================================================ */
+// Caso A: Hay una caja en la cola que el robot disponible y PUEDE llevar la caja
++!revisar_cola : robot_available(R) & pending_container(CId, Weight) 
+                 & robot_capacity(R, MaxW, _, _, _) & Weight <= MaxW <-
+    .print("Sacando de la cola: ", CId, " para el robot ", R);
+    -pending_container(CId, Weight); // Lo quitamos de la cola
+    -robot_available(R);             // Lo volvemos a marcar como ocupado
+    +assigning(CId, R);              // Registramos la asignación temporal
+    get_free_shelf(CId).             // Pedimos la estantería a Java
 
-+!assign_container(Priority, CId, W, H, Weight, Type) <-
-    !find_best_robot(W, H, Weight, Robot);
-    if (Robot \== none) {
-        // Verificar que el robot está realmente en state(idle) antes de asignarle
-        // Esto evita perder tareas cuando el robot está en test_movement o busy
-        .send(Robot, askOne, state(S), S);
-        if (S == idle) {
-            // Robot confirmado como idle: reservar y buscar estantería
-            -robot_available(Robot);
-            -pending_task(Priority, CId, W, H, Weight, Type);
-            +assigning(CId, Robot);   // Estado temporal: esperando respuesta de get_free_shelf
-            .print("[SCHEDULER] Robot seleccionado: ", Robot, " para ", CId, ". Buscando estanteria libre...");
-            get_free_shelf(CId)       // Solicitar estantería apropiada al entorno Java
-        } else {
-            // Robot está ocupado (testing, moving, etc.) → sincronizar y dejar en cola
-            .print("[SCHEDULER] ", Robot, " seleccionado pero en estado '", S, "'. Tarea ", CId, " queda en cola.");
-            -robot_available(Robot)   // Sincronizar: marcarlo como no disponible
-        }
-    } else {
-        .print("[SCHEDULER] Sin robots disponibles para ", CId, " (", Weight, "kg, ", W, "x", H, "). Queda en cola.")
-    }.
+// Caso B: No hay nada en la cola o el robot no puede con lo que hay
++!revisar_cola : true <- 
+    .print("No hay tareas compatibles en la cola por ahora.").
 
-// Plan de fallo: si get_free_shelf falla, restauramos el estado
--!assign_container(Priority, CId, W, H, Weight, Type) <-
-    .print("[SCHEDULER] FALLO al asignar ", CId, ". Restaurando estado.");
-    if (assigning(CId, Robot)) {
-        -assigning(CId, Robot);
-        +robot_available(Robot)
-    };
-    +pending_task(Priority, CId, W, H, Weight, Type).
 
-/* ============================================================================
- * SELECCIÓN DEL MEJOR ROBOT - Estrategia "Best-Fit"
- *
- * DECISIÓN: elegimos el robot más pequeño que pueda manejar el contenedor.
- * Esto preserva robot_heavy (lento y escaso) para las cargas más grandes
- * que solo él puede transportar. La ordenación de planes garantiza que
- * robot_light se intenta primero, luego medium, luego heavy.
- *
- * La capacidad se verifica contra:
- *   - robot_light:  peso ≤ 10kg, tamaño ≤ 1×1
- *   - robot_medium: peso ≤ 30kg, tamaño ≤ 1×2 (W≤1, H≤2)
- *   - robot_heavy:  peso ≤ 100kg, tamaño ≤ 2×3
- * ============================================================================ */
 
-// Robot light: el más rápido, pero solo carga pequeña
-+!find_best_robot(W, H, Weight, robot_light) :
-    robot_available(robot_light) &
-    Weight <= 10 & W <= 1 & H <= 1
-    <- true.
 
-// Robot medium: intermedio - puede con 1×2 hasta 30kg
-+!find_best_robot(W, H, Weight, robot_medium) :
-    robot_available(robot_medium) &
-    Weight <= 30 & W <= 1 & H <= 2
-    <- true.
+// ERRORES
 
-// Robot heavy: el más lento pero el único que puede con cargas 2×2, 2×3 o >30kg
-+!find_best_robot(W, H, Weight, robot_heavy) :
-    robot_available(robot_heavy) &
-    Weight <= 100 & W <= 2 & H <= 3
-    <- true.
++error(container_too_heavy, Data) : assigning(CId, Robot) <-
+    .print("Error de peso: ", Robot, " no pudo con ", CId);
+    -assigning(CId, Robot);          // Borra la asignación fallida
+    +pending_container(CId, 100);    // Lo reencola con un peso alto para que lo coja el Heavy
+    .send(supervisor, tell, error_log(container_too_heavy, CId)).
 
-// Ningún robot disponible o capaz en este momento
-+!find_best_robot(W, H, Weight, none) : true <- true.
-
-/* ============================================================================
- * RECEPCIÓN DE ESTANTERÍA LIBRE → ENVIAR TAREA AL ROBOT
- *
- * Cuando el entorno responde a get_free_shelf(CId) con la percepción
- * free_shelf(CId, ShelfId), enviamos la tarea al robot elegido usando
- * .send(Robot, tell, task(CId, ShelfId)).
- *
- * El mensaje "tell" añade task(CId, ShelfId) a la base de creencias
- * del robot receptor, disparando su plan +task(CId, ShelfId).
- *
- * Tras asignar, intentamos asignar la siguiente tarea pendiente.
- * ============================================================================ */
-
-+free_shelf(CId, ShelfId) : assigning(CId, Robot) <-
-    -free_shelf(CId, ShelfId);   // Limpiar percepción procesada
++error(container_too_big, Data) : assigning(CId, Robot) <-
+    .print("Error de tamaño: ", CId, " no cabe en ", Robot);
     -assigning(CId, Robot);
-    // Enviar tarea al robot directamente via mensaje
-    .send(Robot, tell, task(CId, ShelfId));
-    // Actualizar estadísticas
-    ?tasks_assigned(N);
-    N1 is N + 1;
-    -tasks_assigned(N);
-    +tasks_assigned(N1);
-    .print("[SCHEDULER] *** TAREA ASIGNADA: ", CId,
-           " → ", Robot, " → estanteria ", ShelfId,
-           " | Total asignadas: ", N1, " ***");
-    !try_assign_pending.   // Intentar asignar la siguiente tarea en cola
+    +pending_container(CId, 0); // Lo devuelve a la cola
+    .send(supervisor, tell, error_log(container_too_big, CId)).
 
-// free_shelf sin assigning activo (caso inesperado)
-+free_shelf(CId, ShelfId) : not assigning(CId, _) <-
-    -free_shelf(CId, ShelfId);
-    .print("[SCHEDULER] AVISO: free_shelf recibido sin asignacion activa para ", CId).
 
-/* ============================================================================
- * MANEJO DE ERRORES DEL ENTORNO
- * ============================================================================ */
+// Error ESTANTERÍA llena
++error(shelf_full, SId) : task(CId, SId) <-
+    .print("Estantería ", SId, " llena. Reasignando destino para ", CId);
+    get_free_shelf(CId); // Solicita una nueva estantería al WarehouseArtifact
+    .send(supervisor, tell, error_log(shelf_full, SId)).
 
-// Sin estanterías disponibles: liberar el robot y volver a encolar
-+error(no_shelf_available, Data) : assigning(CId, Robot) <-
-    .print("[SCHEDULER] Sin estanterias para ", CId, ". Liberando ", Robot, ".");
+// Cuando el Java responda con la nueva estantería (SId2)
++free_shelf(CId, SId2) : task(CId, SIdOld) <-
+    -task(CId, SIdOld);
+    +task(CId, SId2);
+    .send(Robot, tell, task(CId, SId2)). // Actualiza la orden al robot
+
+
+// El Scheduler detecta que un robot está bloqueado
++error(route_blocked, Data) : assigning(CId, Robot) | task(CId, _) <-
+    .print("Robot bloqueado en ruta. Cancelando tarea de: ", CId);
+    
+    // 1. Informar al Supervisor del problema estructural
+    .send(supervisor, tell, navigation_error(route_blocked, CId));
+    
+    // 2. Recuperar el contenedor y ponerlo en la cola de espera
+    // (Añadimos el peso 0 de forma temporal o pedimos info de nuevo)
+    +pending_container(CId, 0); 
+    
+    // 3. Limpiar la asignación actual para que el robot pueda reiniciarse
     -assigning(CId, Robot);
-    +robot_available(Robot).
+    .print("Contenedor ", CId, " devuelto a la cola por bloqueo de ruta.").
 
-// Cualquier otro error
-+error(ErrorType, Data) : true <-
-    .print("[SCHEDULER] ERROR recibido: ", ErrorType, " | datos: ", Data).
 
+// Manejo de colisiones o movimientos fuera de límites
++error(ErrorType, Data) : (ErrorType == conflict | ErrorType == illegal_move) 
+                          & assigning(CId, Robot) <-
+    .print("ERROR CRÍTICO de navegación (", ErrorType, ") con el contenedor: ", CId);
+    
+    // Notificar al supervisor para que registre el fallo grave
+    .send(supervisor, tell, critical_navigation_error(ErrorType, Robot));
+    
+    // Devolver el paquete a la cola para que otro robot lo gestione
+    +pending_container(CId, 0);
+    -assigning(CId, Robot);
+    
+    // Opcional: Podrías intentar resetear el estado del robot si fuera necesario
+    .send(Robot, tell, reset_state).
