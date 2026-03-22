@@ -117,19 +117,17 @@ carrying(none).      // Contenedor que está cargando
     -+state(carrying);
     !navigate_to_shelf(ShelfId);
     
-    // Fase 4: Depositar el contenedor
+    // Fase 4: Depositar el contenedor y avisar al supervisor
     .print("[LIGHT] Fase 4: Depositando en ", ShelfId);
     -+state(dropping);
     drop_at(ShelfId);
     .send(supervisor,tell,stored(CId,ShelfId));
     .wait(500);
     
-    // Fase 5: Completar y volver a idle
+    // Fase 5: Completar, volver a idle, regresar al origen y avisar al scheduler 
     .print("[LIGHT] Tarea completada: ", CId);
     -+carrying(none);
     -task(CId, ShelfId);
-
-    // Fase 6: Volver al origen
     .print("[LIGHT] Volviendo al origen...");
     move_to(1,3);
     .send(scheduler,tell,ready);
