@@ -1,4 +1,4 @@
-README - Warehouse Automation System
+README
 
 Sistema inteligente de gestión logística de almacén con robots autónomos, un scheduler y un supervisor para controlar tareas, errores y estadísticas.
 
