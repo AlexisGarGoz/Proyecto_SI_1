@@ -96,9 +96,14 @@ carrying(none).      // Contenedor que está cargando
 +!execute_task(CId, ShelfId) : true <-
     .print("[LIGHT] Iniciando tarea: ", CId);
     
-    // Fase 1: Ir al área de entrada (donde están los contenedores)
-    .print("[LIGHT] Fase 1: Moviéndose al área de entrada");
-    move_to(1, 1); //! Revisar, deberia moverse a la ubi del contenedor
+    // Fase 1: Aproximación a la localización del contenedor
+    .print("[LIGHT] Fase 1: Localizando contenedor ", CId);
+    get_container_location(CId); 
+    .wait(container_pos(CId, _, _), 2000); 
+    ?container_pos(CId, CX, CY);
+    move_to(CX, CY);
+    .wait(500);
+    -container_pos(CId, CX, CY);
     .wait(500);
     
     // Fase 2: Recoger el contenedor
@@ -116,17 +121,19 @@ carrying(none).      // Contenedor que está cargando
     .print("[LIGHT] Fase 4: Depositando en ", ShelfId);
     -+state(dropping);
     drop_at(ShelfId);
+    .send(supervisor,tell,stored(CId,ShelfId));
     .wait(500);
     
     // Fase 5: Completar y volver a idle
     .print("[LIGHT] Tarea completada: ", CId);
-    -+state(idle);
     -+carrying(none);
     -task(CId, ShelfId);
 
     // Fase 6: Volver al origen
     .print("[LIGHT] Volviendo al origen...");
-    move_to(1,3).
+    move_to(1,3);
+    .send(scheduler,tell,ready);
+    -+state(idle).
 
 +!navigate_to_shelf(ShelfId) : true <-
     .print("Buscando coordenadas de ", ShelfId);
