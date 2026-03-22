@@ -298,6 +298,8 @@ public class WarehouseArtifact extends Environment {
             switch (actionName) {
                 case "get_shelf_info": //! Para tener la dirección de una estanteria
                     return executeGetShelfInfo(agName, action);
+                case "get_container_location": 
+                    return executeGetContainerLocation(agName, action);
                 case "move_to":
                     return executeMoveTo(agName, action);
                 case "pickup":
@@ -769,31 +771,31 @@ public class WarehouseArtifact extends Environment {
     }
 
     private Shelf findBestShelfForRobot(Container container, String robotId) {
-    return shelves.values().stream()
-            .filter(shelf -> shelf.canStore(container))
-            .filter(shelf -> {
-                String id = shelf.getId();
+        return shelves.values().stream()
+                .filter(shelf -> shelf.canStore(container))
+                .filter(shelf -> {
+                    String id = shelf.getId();
 
-                if (robotId.equalsIgnoreCase("robot_light")) {
-                    return id.equals("shelf_1") || id.equals("shelf_2") ||
-                           id.equals("shelf_3") || id.equals("shelf_4");
-                }
+                    if (robotId.equalsIgnoreCase("robot_light")) {
+                        return id.equals("shelf_1") || id.equals("shelf_2")
+                                || id.equals("shelf_3") || id.equals("shelf_4");
+                    }
 
-                if (robotId.equalsIgnoreCase("robot_medium")) {
-                    return id.equals("shelf_5") || id.equals("shelf_6") ||
-                           id.equals("shelf_7");
-                }
+                    if (robotId.equalsIgnoreCase("robot_medium")) {
+                        return id.equals("shelf_5") || id.equals("shelf_6")
+                                || id.equals("shelf_7");
+                    }
 
-                if (robotId.equalsIgnoreCase("robot_heavy")) {
-                    return id.equals("shelf_8") || id.equals("shelf_9");
-                }
+                    if (robotId.equalsIgnoreCase("robot_heavy")) {
+                        return id.equals("shelf_8") || id.equals("shelf_9");
+                    }
 
-                return false;
-            })
-            .sorted(Comparator.comparingDouble(Shelf::getOccupancyPercentage))
-            .findFirst()
-            .orElse(null);
-}
+                    return false;
+                })
+                .sorted(Comparator.comparingDouble(Shelf::getOccupancyPercentage))
+                .findFirst()
+                .orElse(null);
+    }
 
     /**
      * Acción: get_container_info(ContainerId) Obtiene información sobre un
@@ -825,68 +827,104 @@ public class WarehouseArtifact extends Environment {
     }
 
     /**
- * Acción: get_free_shelf(ContainerId, RobotName)
- * Busca una estantería libre filtrando por la zona de operación permitida para cada robot.
- * * @param agName Nombre del agente que solicita la acción (normalmente el scheduler).
- * @param action Estructura de la acción con los términos (ID Contenedor, Nombre Robot).
- * @return true si encuentra una estantería válida en la zona correspondiente.
- */
-private boolean executeGetFreeShelf(String agName, Structure action) {
-    try {
-        // Extracción y limpieza de parámetros
-        String containerId = action.getTerm(0).toString().replace("\"", "");
-        String targetRobot = action.getTerm(1).toString().toLowerCase();
+     * Acción: get_container_location(ContainerId) Proporciona la ubicación
+     * actual (X, Y) del contenedor al agente.
+     */
+    private boolean executeGetContainerLocation(String agName, Structure action) {
+        try {
+            // 1. Obtener y limpiar el ID del contenedor del primer término de la acción
+            String containerId = action.getTerm(0).toString().replace("\"", "");
 
-        Container container = containers.get(containerId);
-        if (container == null) {
-            view.logMessage("Error: Contenedor " + containerId + " no encontrado.");
+            // 2. Buscar el contenedor en el mapa del almacén
+            Container container = containers.get(containerId);
+
+            if (container != null) {
+                // 3. Eliminar percepciones de ubicación antiguas para este contenedor si existen
+                removePerceptsByUnif(agName, Literal.parseLiteral("container_pos(\"" + containerId + "\", _, _)"));
+
+                // 4. Añadir la percepción con las coordenadas actuales
+                // Esto genera una creencia como: container_pos("container_1", 1, 0)
+                addPercept(agName, Literal.parseLiteral(
+                        "container_pos(\"" + containerId + "\"," + container.getX() + "," + container.getY() + ")"
+                ));
+
+                return true;
+            } else {
+                // Si el contenedor no existe, notificamos el error
+                addError(agName, "container_not_found", containerId);
+                return false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
             return false;
         }
-
-        // Filtrado inicial: ¿Cabe físicamente y hay hueco?
-        List<Shelf> capableShelves = shelves.values().stream()
-                .filter(s -> s.canStore(container) && !s.isFull())
-                .collect(Collectors.toList());
-
-        // Selección por Zonas Estrictas (Business Logic)
-        Shelf selectedShelf = null;
-
-        if (targetRobot.contains("light")) {
-            // Zona Light: Estanterías 1 a 4
-            selectedShelf = capableShelves.stream()
-                    .filter(s -> s.getId().matches("shelf_[1-4]"))
-                    .findFirst().orElse(null);
-        } 
-        else if (targetRobot.contains("medium")) {
-            // Zona Medium: Estanterías 5 a 7
-            selectedShelf = capableShelves.stream()
-                    .filter(s -> s.getId().matches("shelf_[5-7]"))
-                    .findFirst().orElse(null);
-        } 
-        else if (targetRobot.contains("heavy")) {
-            // Zona Heavy: Estanterías 8 y 9
-            selectedShelf = capableShelves.stream()
-                    .filter(s -> s.getId().matches("shelf_[8-9]"))
-                    .findFirst().orElse(null);
-        }
-
-        // Respuesta al Scheduler vía Percepción
-        if (selectedShelf != null) {
-            // Limpiamos percepciones antiguas para evitar duplicados en la mente del Scheduler
-            removePercept(agName, Literal.parseLiteral("free_shelf(\"" + containerId + "\", _)"));
-            
-            // Añadimos la nueva percepción
-            addPercept(agName, Literal.parseLiteral("free_shelf(\"" + containerId + "\",\"" + selectedShelf.getId() + "\")"));
-            
-            return true;
-        } 
-
-        return false;
-
-    } catch (Exception e) {
-        return false;
     }
-}
+
+    /**
+     * Acción: get_free_shelf(ContainerId, RobotName) Busca una estantería libre
+     * filtrando por la zona de operación permitida para cada robot.
+     *
+     * * @param agName Nombre del agente que solicita la acción (normalmente el
+     * scheduler).
+     * @param action Estructura de la acción con los términos (ID Contenedor,
+     * Nombre Robot).
+     * @return true si encuentra una estantería válida en la zona
+     * correspondiente.
+     */
+    private boolean executeGetFreeShelf(String agName, Structure action) {
+        try {
+            // Extracción y limpieza de parámetros
+            String containerId = action.getTerm(0).toString().replace("\"", "");
+            String targetRobot = action.getTerm(1).toString().toLowerCase();
+
+            Container container = containers.get(containerId);
+            if (container == null) {
+                view.logMessage("Error: Contenedor " + containerId + " no encontrado.");
+                return false;
+            }
+
+            // Filtrado inicial: ¿Cabe físicamente y hay hueco?
+            List<Shelf> capableShelves = shelves.values().stream()
+                    .filter(s -> s.canStore(container) && !s.isFull())
+                    .collect(Collectors.toList());
+
+            // Selección por Zonas Estrictas (Business Logic)
+            Shelf selectedShelf = null;
+
+            if (targetRobot.contains("light")) {
+                // Zona Light: Estanterías 1 a 4
+                selectedShelf = capableShelves.stream()
+                        .filter(s -> s.getId().matches("shelf_[1-4]"))
+                        .findFirst().orElse(null);
+            } else if (targetRobot.contains("medium")) {
+                // Zona Medium: Estanterías 5 a 7
+                selectedShelf = capableShelves.stream()
+                        .filter(s -> s.getId().matches("shelf_[5-7]"))
+                        .findFirst().orElse(null);
+            } else if (targetRobot.contains("heavy")) {
+                // Zona Heavy: Estanterías 8 y 9
+                selectedShelf = capableShelves.stream()
+                        .filter(s -> s.getId().matches("shelf_[8-9]"))
+                        .findFirst().orElse(null);
+            }
+
+            // Respuesta al Scheduler vía Percepción
+            if (selectedShelf != null) {
+                // Limpiamos percepciones antiguas para evitar duplicados en la mente del Scheduler
+                removePercept(agName, Literal.parseLiteral("free_shelf(\"" + containerId + "\", _)"));
+
+                // Añadimos la nueva percepción
+                addPercept(agName, Literal.parseLiteral("free_shelf(\"" + containerId + "\",\"" + selectedShelf.getId() + "\")"));
+
+                return true;
+            }
+
+            return false;
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     /**
      * Acción: scan_surroundings() Escanea las celdas alrededor del robot
@@ -894,8 +932,9 @@ private boolean executeGetFreeShelf(String agName, Structure action) {
     private boolean executeScanSurroundings(String agName, Structure action) {
         try {
             Robot robot = robots.get(agName);
-            if (robot == null)
+            if (robot == null) {
                 return false;
+            }
 
             int x = robot.getX();
             int y = robot.getY();
