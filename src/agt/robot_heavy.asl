@@ -97,10 +97,15 @@ carrying(none).      // Contenedor que está cargando
 +!execute_task(CId, ShelfId) : true <-
     .print("[HEAVY] Iniciando transporte de carga pesada: ", CId);
     
-    // Fase 1: Aproximación cuidadosa al área de entrada
-    .print("[HEAVY] Fase 1: Aproximación al área de entrada");
-    move_to(1, 1); //! Revisar, deberia moverse a la ubi del contenedor
-    .wait(1000);  // Robot pesado es más lento
+    // Fase 1: Aproximación a la localización del contenedor
+    .print("[HEAVY] Fase 1: Localizando contenedor ", CId);
+    get_container_location(CId); 
+    .wait(container_pos(CId, _, _), 2000); 
+    ?container_pos(CId, CX, CY);
+    move_to(CX, CY);
+    .wait(500);
+    -container_pos(CId, CX, CY);
+    .wait(500);
     
     // Fase 2: Recoger el contenedor pesado
     .print("[HEAVY] Fase 2: Recogiendo contenedor pesado ", CId);
@@ -117,17 +122,19 @@ carrying(none).      // Contenedor que está cargando
     .print("[HEAVY] Fase 4: Depositando carga en ", ShelfId);
     -+state(dropping);
     drop_at(ShelfId);
+    .send(supervisor,tell,stored(CId,ShelfId));
     .wait(1000);
     
     // Fase 5: Completar y volver a idle
     .print("[HEAVY] Tarea especializada completada: ", CId);
-    -+state(idle);
     -+carrying(none);
-    -task(CId, ShelfId)
+    -task(CId, ShelfId);
 
     // Fase 6: Vuelve a su posición inicial
     .print("[HEAVY] Volviendo al origen...");
-    move_to(3,3).
+    move_to(3,3);
+    .send(scheduler,tell,ready);
+    -+state(idle).
 
 +!navigate_to_shelf(ShelfId) : true <-
     .print("[HEAVY] Localizando estantería: ", ShelfId);
