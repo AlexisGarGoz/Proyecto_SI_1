@@ -88,4 +88,4 @@ errors_by_type(route_blocked, 0).
 
     .wait(20000);
 
-    !periodic_stats. //explica cada llinea de este codigo
+    !periodic_stats. 
