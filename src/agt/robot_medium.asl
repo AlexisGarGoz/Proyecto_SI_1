@@ -114,14 +114,12 @@ carrying(none).      // Contenedor que está cargando
     .send(supervisor,tell,stored(CId,ShelfId));
     .wait(600);
     
-    // Fase 5: Completar y volver a idle
+    // Fase 5: Completar, volver a idle, regresar al origen y avisar al scheduler 
     .print("[MEDIUM] Tarea completada: ", CId);
     -+carrying(none);
     -task(CId, ShelfId);
-
-    // Fase 6: Vuelve a su posición inicial
-    .print("[MEDIUM] Volvindo a su posicion inicial: ");
-    move_to(2,3);
+    .print("[MEDIUM] Volviendo al origen...");
+    move_to(1,3);
     .send(scheduler,tell,ready);
     -+state(idle).
 
