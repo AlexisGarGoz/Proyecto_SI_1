@@ -86,10 +86,15 @@ carrying(none).      // Contenedor que está cargando
 +!execute_task(CId, ShelfId) : true <-
     .print("[MEDIUM] Iniciando tarea: ", CId);
     
-    // Fase 1: Ir al área de entrada
-    .print("[MEDIUM] Fase 1: Moviéndose al área de entrada");
-    move_to(1, 1);
-    .wait(600);  // Robot medio es más lento
+    // Fase 1: Aproximación a la localización del contenedor
+    .print("[MEDIUM] Fase 1: Localizando contenedor ", CId);
+    get_container_location(CId); 
+    .wait(container_pos(CId, _, _), 2000); 
+    ?container_pos(CId, CX, CY);
+    move_to(CX, CY);
+    .wait(500);
+    -container_pos(CId, CX, CY);
+    .wait(500);
     
     // Fase 2: Recoger el contenedor
     .print("[MEDIUM] Fase 2: Recogiendo contenedor ", CId);
@@ -106,17 +111,19 @@ carrying(none).      // Contenedor que está cargando
     .print("[MEDIUM] Fase 4: Depositando en ", ShelfId);
     -+state(dropping);
     drop_at(ShelfId);
+    .send(supervisor,tell,stored(CId,ShelfId));
     .wait(600);
     
     // Fase 5: Completar y volver a idle
     .print("[MEDIUM] Tarea completada: ", CId);
-    -+state(idle);
     -+carrying(none);
     -task(CId, ShelfId);
 
     // Fase 6: Vuelve a su posición inicial
     .print("[MEDIUM] Volvindo a su posicion inicial: ");
-    move_to(2,3).
+    move_to(2,3);
+    .send(scheduler,tell,ready);
+    -+state(idle).
 
 +!navigate_to_shelf(ShelfId) : true <-
     .print("Buscando coordenadas de ", ShelfId);
