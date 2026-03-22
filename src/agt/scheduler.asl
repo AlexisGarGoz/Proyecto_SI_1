@@ -18,7 +18,7 @@
  * CREENCIAS INICIALES - Base de Conocimiento
  * ============================================================================ */
 
-/* Capacidades de los robots (debe coincidir con .mas2j) */
+/* Capacidades de los robots */
 robot_capacity(robot_light, 10, 1, 1, 3).    // (Robot, MaxPeso, MaxW, MaxH, Velocidad)
 robot_capacity(robot_medium, 30, 1, 2, 2).
 robot_capacity(robot_heavy, 100, 2, 3, 1).
@@ -40,7 +40,7 @@ pending_containers(0).
 
 
 
-// 2. RECIBIR INFO Y CLASIFICAR (Versión optimizada para AgentSpeak)
+// 2. RECIBIR INFO Y CLASIFICAR
 
 // CASO A: Peso para Robot Ligero y está disponible
 +container_info(CId, W, H, Weight, Type) 
@@ -69,7 +69,7 @@ pending_containers(0).
     +assigning(CId, robot_heavy);
     get_free_shelf(CId).
 
-// CASO D: Comodín (Fallback) - Si ningún plan anterior se ejecutó
+// CASO D: Si ningún plan anterior se ejecutó
 // (Porque los robots están ocupados o el peso no encaja)
 +container_info(CId, W, H, Weight, Type) : true <-
     .print("No hay robots disponibles para ", CId, ". Añadiendo a cola de espera.");
@@ -103,9 +103,6 @@ pending_containers(0).
 // Caso B: No hay nada en la cola o el robot no puede con lo que hay
 +!revisar_cola : true <- 
     .print("No hay tareas compatibles en la cola por ahora.").
-
-
-
 
 // ERRORES
 
